@@ -84,7 +84,9 @@
   // Site adresinden repo bilgisi: <kullanici>.github.io/<repo>/
   const OWNER = location.hostname.split('.')[0];
   const REPO = location.pathname.split('/').filter(Boolean)[0] || (OWNER + '.github.io');
-  const DATA_URL = `https://api.github.com/repos/${OWNER}/${REPO}/contents/data.json?ref=data`;
+  // raw.githubusercontent: istek siniri yok (API saatte 60 istekle sinirli). Yedek: API.
+  const RAW_URL = `https://raw.githubusercontent.com/${OWNER}/${REPO}/data/data.json`;
+  const API_URL = `https://api.github.com/repos/${OWNER}/${REPO}/contents/data.json?ref=data`;
   const POT = /Potion|\bPot\b|Water of|Holy Water|Elixir|Recovery|Restore|Mana|\bHP\b|\bMP\b/i;
   const fmt = new Intl.NumberFormat('tr-TR');
   const $ = (id) => document.getElementById(id);
@@ -145,7 +147,8 @@
 
   async function load() {
     try {
-      const res = await fetch(DATA_URL, { headers: { Accept: 'application/vnd.github.raw+json' }, cache: 'no-store' });
+      let res = await fetch(RAW_URL + '?t=' + Date.now(), { cache: 'no-store' }).catch(() => null);
+      if (!res || !res.ok) res = await fetch(API_URL, { headers: { Accept: 'application/vnd.github.raw+json' }, cache: 'no-store' });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
       if (data.updated) lastUpdated = new Date(data.updated);
