@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KO Loot Toplam</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=Inter:wght@400;500;600&display=swap">
+<style>
+  /* Layout: tek kolon; ustte canli durum + 4 sayi, altta kisi tablosu */
+  :root {
+    --bg: #f3f1ec; --panel: #ffffff; --fg: #1d1f24; --muted: #6b6f78; --line: #e2ded5;
+    --gold: #a8740a; --pot: #8a3fb8; --item: #1f6f8b; --live: #2e8b57; --stale: #b5651d;
+    --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+    --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #121317; --panel: #1b1d22; --fg: #e8e6e1; --muted: #9a9ea6; --line: #2b2e35;
+            --gold: #f0c050; --pot: #c78cf0; --item: #6cc3e0; --live: #5fd08e; --stale: #f0a050; color-scheme: dark; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--body); }
+  .wrap { max-width: 1000px; margin: 0 auto; padding-block: 28px 48px;
+          padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+          display: flex; flex-direction: column; gap: 22px; }
+  header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; }
+  h1 { font-family: var(--display); font-weight: 600; font-size: 40px; line-height: 1; margin: 0; letter-spacing: .01em; text-wrap: balance; }
+  .status { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+  .status.live .dot { background: var(--live); box-shadow: 0 0 0 4px color-mix(in srgb, var(--live) 22%, transparent); }
+  .status.stale .dot { background: var(--stale); }
+  .lede { margin: 0; color: var(--muted); max-width: 65ch; }
+  .lede b { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .tile { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .tile span:first-child { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .tile .v { font-family: var(--display); font-size: 34px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .v.gold { color: var(--gold); } .v.pot { color: var(--pot); } .v.item { color: var(--item); }
+  h2 { font-family: var(--display); font-size: 24px; font-weight: 600; margin: 0; }
+  .tablebox { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 10px 14px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: 0; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.name { font-weight: 600; white-space: nowrap; }
+  td.coin { color: var(--gold); font-weight: 600; }
+  .chips { min-width: 240px; }
+  .chip { display: inline-block; border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px; margin: 2px 4px 2px 0; font-size: 13px; white-space: nowrap; }
+  .chip.pot { color: var(--pot); } .chip.item { color: var(--item); font-weight: 600; border-color: color-mix(in srgb, var(--item) 45%, var(--line)); }
+  .empty { text-align: center; color: var(--muted); padding: 28px; }
+  .note { margin: 0; font-size: 13px; color: var(--muted); max-width: 70ch; }
+  .err { color: var(--stale); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>KO Loot Toplam</h1>
+    <div class="status" id="status"><span class="dot"></span><span id="statusText">Yükleniyor…</span></div>
+  </header>
+  <p class="lede" id="lede">Veri yükleniyor…</p>
+
+  <section class="tiles" aria-label="Genel toplamlar">
+    <div class="tile"><span>Toplam coin</span><span class="v gold" id="tCoin">—</span></div>
+    <div class="tile"><span>Pot</span><span class="v pot" id="tPot">—</span></div>
+    <div class="tile"><span>Item</span><span class="v item" id="tItem">—</span></div>
+    <div class="tile"><span>Kişi</span><span class="v" id="tKisi">—</span></div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:10px">
+    <h2>Kişi başına toplam</h2>
+    <div class="tablebox">
+      <table>
+        <thead><tr><th>Kişi</th><th class="num">Coin</th><th class="num">Pot</th><th class="num">Item</th><th>Düşenler</th></tr></thead>
+        <tbody id="rows"><tr><td colspan="5" class="empty">Yükleniyor…</td></tr></tbody>
+      </table>
+    </div>
+    <p class="note">Kayıtlar oyundaki sohbet kutusundan otomatik okunur ve her dakika güncellenir; sayfa 90 saniyede bir kendini yeniler. "BEN", sohbette "Picked up" diye geçen kendi topladıklarıdır. Pot: adında Potion, Holy Water, Elixir, Mana gibi kelimeler geçen eşyalar.</p>
+  </section>
+</div>
+
+<script>
+  // Site adresinden repo bilgisi: <kullanici>.github.io/<repo>/
+  const OWNER = location.hostname.split('.')[0];
+  const REPO = location.pathname.split('/').filter(Boolean)[0] || (OWNER + '.github.io');
+  const DATA_URL = `https://api.github.com/repos/${OWNER}/${REPO}/contents/data.json?ref=data`;
+  const POT = /Potion|\bPot\b|Water of|Holy Water|Elixir|Recovery|Restore|Mana|\bHP\b|\bMP\b/i;
+  const fmt = new Intl.NumberFormat('tr-TR');
+  const $ = (id) => document.getElementById(id);
+  let lastUpdated = null;
+
+  function aggregate(rows) {
+    const by = new Map();
+    for (const r of rows) {
+      const k = String(r.kisi || '').trim(); if (!k) continue;
+      if (!by.has(k)) by.set(k, { kisi: k, coin: 0, pot: 0, item: 0, esya: new Map() });
+      const p = by.get(k);
+      if (r.tur === 'Coin') { p.coin += Number(r.coin) || 0; continue; }
+      const n = Number(r.adet) || 1, name = String(r.esya || '').trim(), isPot = POT.test(name);
+      if (isPot) p.pot += n; else p.item += n;
+      const key = name.toLowerCase(); const e = p.esya.get(key) || { ad: name, adet: 0, pot: isPot };
+      e.adet += n; p.esya.set(key, e);
+    }
+    return [...by.values()].sort((a, b) => (b.coin - a.coin) || ((b.pot + b.item) - (a.pot + a.item)));
+  }
+
+  function render(data) {
+    const people = aggregate(data.rows || []);
+    const sum = (f) => people.reduce((s, p) => s + p[f], 0);
+    $('tCoin').textContent = fmt.format(sum('coin'));
+    $('tPot').textContent = fmt.format(sum('pot'));
+    $('tItem').textContent = fmt.format(sum('item'));
+    $('tKisi').textContent = fmt.format(people.length);
+    const leader = people.find((p) => p.coin > 0);
+    const lede = $('lede'); lede.replaceChildren();
+    const add = (t, bold) => { const n = bold ? document.createElement('b') : document.createTextNode(t); if (bold) n.textContent = t; lede.appendChild(n); };
+    add('Partide '); add(fmt.format(people.length), true); add(' kişiye toplam '); add(fmt.format(sum('coin')), true);
+    add(' coin, '); add(fmt.format(sum('pot')), true); add(' pot ve '); add(fmt.format(sum('item')), true); add(' item gitti.');
+    if (leader) { add(' En çok coin alan: '); add(leader.kisi, true); add('.'); }
+
+    const tb = $('rows'); tb.replaceChildren();
+    if (!people.length) { tb.innerHTML = '<tr><td colspan="5" class="empty">Henüz loot yok</td></tr>'; return; }
+    for (const p of people) {
+      const tr = document.createElement('tr');
+      const cell = (txt, cls) => { const td = document.createElement('td'); td.className = cls || ''; td.textContent = txt; tr.appendChild(td); return td; };
+      cell(p.kisi, 'name'); cell(fmt.format(p.coin), 'num coin'); cell(fmt.format(p.pot), 'num'); cell(fmt.format(p.item), 'num');
+      const det = cell('', 'chips');
+      const list = [...p.esya.values()].sort((a, b) => (a.pot - b.pot) || (b.adet - a.adet));
+      if (!list.length) det.textContent = '—';
+      for (const e of list) { const s = document.createElement('span'); s.className = 'chip ' + (e.pot ? 'pot' : 'item'); s.textContent = `${e.adet} x ${e.ad}`; det.appendChild(s); }
+      tb.appendChild(tr);
+    }
+  }
+
+  function updateStatus(err) {
+    const st = $('status'), txt = $('statusText');
+    if (!lastUpdated) { st.className = 'status'; txt.textContent = err ? 'Veri alınamadı' : 'Yükleniyor…'; return; }
+    const mins = Math.max(0, Math.round((Date.now() - lastUpdated.getTime()) / 60000));
+    const fresh = mins <= 5;
+    st.className = 'status ' + (fresh ? 'live' : 'stale');
+    txt.textContent = (fresh ? 'Canlı · ' : 'Bekliyor · ') + 'son veri ' + (mins === 0 ? 'az önce' : mins + ' dk önce') +
+      ' (' + lastUpdated.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) + ')' + (err ? ' · bağlantı hatası' : '');
+  }
+
+  async function load() {
+    try {
+      const res = await fetch(DATA_URL, { headers: { Accept: 'application/vnd.github.raw+json' }, cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      if (data.updated) lastUpdated = new Date(data.updated);
+      render(data); updateStatus(false);
+    } catch (e) { updateStatus(true); }
+  }
+  load();
+  setInterval(load, 90000);
+  setInterval(() => updateStatus(false), 30000);
+</script>
+</body>
+</html>
